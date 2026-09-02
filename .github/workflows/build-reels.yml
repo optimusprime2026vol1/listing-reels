@@ -1,0 +1,65 @@
+name: Build Reels
+
+# Push new/updated photos, music, or a config to trigger a cloud build.
+# No local install required.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/photos/**"
+      - "assets/music/**"
+      - "assets/voiceover/**"
+      - "configs/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg and fonts
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build every listing config
+        run: |
+          mkdir -p renders
+          shopt -s nullglob
+          configs=(configs/*.yaml)
+          if [ ${#configs[@]} -eq 0 ]; then
+            echo "No configs found in configs/ -- nothing to build."
+            exit 0
+          fi
+          for cfg in "${configs[@]}"; do
+            name=$(basename "$cfg" .yaml)
+            echo "::group::Building $name"
+            python -m listingreels build --listing "$cfg" --out "renders/${name}.mp4"
+            echo "::endgroup::"
+          done
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reels-${{ github.run_number }}
+          path: renders/*.mp4
+          if-no-files-found: warn
+
+      - name: Publish a release with the rendered reels
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Reels build #${{ github.run_number }}"
+          body: "Auto-built from commit ${{ github.sha }}"
+          files: renders/*.mp4

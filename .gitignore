@@ -3,8 +3,10 @@ __pycache__/
 .venv/
 venv/
 output/
-assets/photos/
-assets/music/
-assets/voiceover/
+renders/
 *.mp4
 .DS_Store
+
+# assets/photos, assets/music, assets/voiceover are intentionally NOT
+# ignored -- commit real listing inputs here so the GitHub Actions
+# workflow can pick them up and build in the cloud.

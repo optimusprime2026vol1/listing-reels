@@ -90,6 +90,27 @@ configs/
   123-main-st.yaml   # example config
 ```
 
+## Build in the cloud (no local install)
+
+A GitHub Actions workflow (`.github/workflows/build-reels.yml`) builds every
+reel automatically -- you never need Python, ffmpeg, or this repo checked
+out on your own machine.
+
+1. **One-time setup**: in the repo, go to Settings → Actions → General →
+   Workflow permissions, and select "Read and write permissions" (needed so
+   the workflow can publish a release with your video).
+2. Add your photos under `assets/photos/<listing-name>/` and a matching
+   `configs/<listing-name>.yaml`, then commit and push (or upload the files
+   directly in the GitHub web UI -- no git CLI needed).
+3. Push to `main`. The Actions tab will show a running build.
+4. When it finishes, check the repo's **Releases** page -- your `.mp4` is
+   attached there, ready to download and post. It's also uploaded as a
+   workflow run artifact.
+
+Every push that touches `configs/`, `assets/photos/`, `assets/music/`, or
+`assets/voiceover/` rebuilds *all* listing configs and publishes a new
+release tagged `build-<run number>`.
+
 ## Notes / next steps
 
 - **Voiceover**: `voiceover` in the config points to a pre-rendered audio
