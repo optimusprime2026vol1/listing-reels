@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+output/
+assets/photos/
+assets/music/
+assets/voiceover/
+*.mp4
+.DS_Store
