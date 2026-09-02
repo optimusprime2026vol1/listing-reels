@@ -1,0 +1,28 @@
+title: "123 Main St"
+address: "123 Main St, Springfield"
+price: "$649,000"
+agent: "Listed by Jordan Lee · Springfield Realty"
+
+photos_dir: "assets/photos/123-main-st"
+photos:
+  - file: living-room.jpg
+    room: "Living Room"
+    duration: 2.8
+  - file: kitchen.jpg
+    room: "Kitchen"
+    duration: 2.8
+  - file: bedroom.jpg
+    room: "Primary Bedroom"
+    duration: 2.8
+  - file: bathroom.jpg
+    room: "Bathroom"
+    duration: 2.4
+
+music: null          # e.g. "assets/music/upbeat.mp3"
+music_volume: 0.5
+voiceover: null       # e.g. "assets/voiceover/123-main-st.mp3"
+
+resolution: [1080, 1920]
+fps: 30
+transition: 0.4
+output: "output/123-main-st.mp4"
