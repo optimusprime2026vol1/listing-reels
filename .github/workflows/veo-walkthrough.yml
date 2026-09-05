@@ -1,8 +1,7 @@
 name: Veo AI Walkthrough
 
 # Push a reference photo to trigger a photoreal AI walkthrough video via
-# Veo 3.1 (Gemini API). No local install, no GCP service account needed --
-# just a GEMINI_API_KEY secret.
+# Veo on Vertex AI. No local install required.
 on:
   push:
     branches: [main]
@@ -21,6 +20,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,7 +38,7 @@ jobs:
 
       - name: Generate walkthroughs
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           mkdir -p renders_ai
           shopt -s nullglob
@@ -40,6 +47,7 @@ jobs:
             echo "No reference photos found in assets/reference-photos/ -- nothing to do."
             exit 0
           fi
+          export GOOGLE_ACCESS_TOKEN=$(gcloud auth print-access-token)
           for photo in "${photos[@]}"; do
             name=$(basename "$photo")
             base="${name%.*}"
