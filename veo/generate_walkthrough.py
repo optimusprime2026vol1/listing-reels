@@ -58,7 +58,9 @@ def main() -> int:
         "instances": [
             {
                 "prompt": prompt,
-                "image": {"inlineData": {"mimeType": mime_type, "data": image_b64}},
+                # Veo rejects `inlineData`/`fileUri` with a 400; the first-frame
+                # image must use `bytesBase64Encoded` + `mimeType`.
+                "image": {"bytesBase64Encoded": image_b64, "mimeType": mime_type},
             }
         ],
         "parameters": {
