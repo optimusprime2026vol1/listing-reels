@@ -54,39 +54,58 @@ def main() -> int:
     with open(args.image, "rb") as f:
         image_b64 = base64.b64encode(f.read()).decode("utf-8")
 
-    body = {
-        "instances": [
-            {
-                "prompt": prompt,
-                # Veo rejects `inlineData`/`fileUri` with a 400; the first-frame
-                # image must use `bytesBase64Encoded` + `mimeType`.
-                "image": {"bytesBase64Encoded": image_b64, "mimeType": mime_type},
-            }
-        ],
-        "parameters": {
+    def build_body(params: dict) -> dict:
+        return {
+            "instances": [
+                {
+                    "prompt": prompt,
+                    # Veo rejects `inlineData`/`fileUri` with a 400; the first-frame
+                    # image must use `bytesBase64Encoded` + `mimeType`.
+                    "image": {"bytesBase64Encoded": image_b64, "mimeType": mime_type},
+                }
+            ],
+            "parameters": params,
+        }
+
+    # Preferred settings first; if the API rejects a parameter, fall back to
+    # progressively simpler ones rather than failing the whole run.
+    attempts = [
+        {
             "aspectRatio": "9:16",
             "resolution": "1080p",
-            # 1080p requires an 8s duration for image-to-video.
-            "durationSeconds": "8",
-            # Required value for image-to-video per Veo docs.
+            "durationSeconds": 8,
             "personGeneration": "allow_adult",
         },
-    }
+        {
+            "aspectRatio": "9:16",
+            "resolution": "720p",
+            "durationSeconds": 8,
+            "personGeneration": "allow_adult",
+        },
+        {
+            "aspectRatio": "9:16",
+        },
+    ]
 
-    print(f"Submitting {args.image} to {model}...")
-    resp = requests.post(
-        f"{BASE_URL}/models/{model}:predictLongRunning",
-        headers=headers,
-        json=body,
-        timeout=120,
-    )
-    if not resp.ok:
-        print(f"Submit failed ({resp.status_code}): {resp.text}")
-        return 1
-    op_name = resp.json().get("name")
-    if not op_name:
-        print(f"No operation name in response: {resp.text}")
-        return 1
+    op_name = None
+    for i, params in enumerate(attempts, start=1):
+        print(f"Submitting {args.image} to {model} (attempt {i}: {params})...")
+        resp = requests.post(
+            f"{BASE_URL}/models/{model}:predictLongRunning",
+            headers=headers,
+            json=build_body(params),
+            timeout=120,
+        )
+        if resp.ok:
+            op_name = resp.json().get("name")
+            if op_name:
+                break
+            print(f"No operation name in response: {resp.text}")
+            return 1
+        print(f"Attempt {i} rejected ({resp.status_code}): {resp.text}")
+        if i == len(attempts):
+            print("All attempts failed.")
+            return 1
     print(f"Operation submitted: {op_name}")
 
     deadline = time.time() + MAX_WAIT_SECONDS
