@@ -130,7 +130,8 @@
       Needs <b>Contents: Read and write</b> and <b>Actions: Read</b> on
       <code>optimusprime2026vol1/listing-reels</code>.
       <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">Create one here</a>.
-      Kept only in this browser tab (sessionStorage) &mdash; never sent anywhere but api.github.com.
+      Saved only in this browser (localStorage) &mdash; never sent anywhere but api.github.com.
+      <span id="clearToken" style="cursor:pointer; text-decoration:underline;">Clear saved token</span>
     </div>
   </div>
 
@@ -186,15 +187,21 @@
   const errorMsgEl = document.getElementById("errorMsg");
   const downloadLink = document.getElementById("downloadLink");
   const resetLink = document.getElementById("resetLink");
+  const clearTokenLink = document.getElementById("clearToken");
 
   let selectedFile = null;
   let startTime = null;
   let timerHandle = null;
 
-  // Restore token for convenience within this tab's session only.
-  tokenInput.value = sessionStorage.getItem("gh_token") || "";
+  // Persist the token in this browser (device) so it only needs to be
+  // pasted once. It is never sent anywhere except api.github.com.
+  tokenInput.value = localStorage.getItem("gh_token") || "";
   tokenInput.addEventListener("input", () => {
-    sessionStorage.setItem("gh_token", tokenInput.value);
+    localStorage.setItem("gh_token", tokenInput.value);
+  });
+  clearTokenLink.addEventListener("click", () => {
+    localStorage.removeItem("gh_token");
+    tokenInput.value = "";
   });
 
   drop.addEventListener("click", () => fileInput.click());
