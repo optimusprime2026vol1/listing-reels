@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Walkthrough Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e2229;
+    --border: #2a2f3a;
+    --text: #e8eaed;
+    --muted: #9aa3af;
+    --accent: #6ee7b7;
+    --accent-dim: #1f4d3c;
+    --danger: #f87171;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  .wrap { width: 100%; max-width: 560px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input[type="password"], textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+  }
+  textarea { min-height: 90px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.5; }
+  .hint a { color: var(--accent); }
+  .drop {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .drop.dragover { border-color: var(--accent); background: var(--accent-dim); }
+  .drop p { margin: 0; color: var(--muted); font-size: 14px; }
+  .preview { display: none; margin-top: 14px; text-align: center; }
+  .preview img { max-width: 100%; max-height: 220px; border-radius: 10px; border: 1px solid var(--border); }
+  .preview .fname { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #0a1f16;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; font-size: 14px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .steps li:last-child { border-bottom: none; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .steps li.active .dot { background: var(--warn); box-shadow: 0 0 0 4px rgba(251,191,36,0.15); }
+  .steps li.active { color: var(--text); }
+  .steps li.done .dot { background: var(--accent); }
+  .steps li.done { color: var(--text); }
+  .steps li.error .dot { background: var(--danger); }
+  .steps li.error { color: var(--danger); }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--warn);
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-box { display: none; }
+  .elapsed { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
+  .error-msg {
+    background: #2a1518; border: 1px solid #5c2a2f; color: #fca5a5;
+    border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-top: 10px;
+    display: none; white-space: pre-wrap; word-break: break-word;
+  }
+  .download-link {
+    display: block; text-align: center; margin-top: 14px;
+    background: var(--accent); color: #0a1f16; text-decoration: none;
+    padding: 12px; border-radius: 8px; font-weight: 600; font-size: 14px;
+  }
+  .reset-link {
+    display: inline-block; margin-top: 14px; color: var(--muted);
+    font-size: 13px; cursor: pointer; text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI Walkthrough Dashboard</h1>
+  <div class="sub">Upload one interior photo &rarr; Veo generates a photoreal walkthrough &rarr; download when ready.</div>
+
+  <div class="card" id="setupCard">
+    <label for="token">GitHub token (fine-grained, this repo only)</label>
+    <input type="password" id="token" placeholder="github_pat_..." autocomplete="off" />
+    <div class="hint">
+      Needs <b>Contents: Read and write</b> and <b>Actions: Read</b> on
+      <code>optimusprime2026vol1/listing-reels</code>.
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">Create one here</a>.
+      Kept only in this browser tab (sessionStorage) &mdash; never sent anywhere but api.github.com.
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Reference photo</label>
+    <div class="drop" id="drop">
+      <p>Drag a photo here, or click to choose one</p>
+      <input type="file" id="fileInput" accept="image/jpeg,image/png" style="display:none" />
+    </div>
+    <div class="preview" id="preview">
+      <img id="previewImg" />
+      <div class="fname" id="previewName"></div>
+    </div>
+
+    <label style="margin-top:16px">Custom camera prompt (optional)</label>
+    <textarea id="promptBox" placeholder="Leave blank to use the default cinematic walkthrough prompt for every photo."></textarea>
+
+    <button id="generateBtn" disabled>Generate Walkthrough</button>
+  </div>
+
+  <div class="card status-box" id="statusCard">
+    <ul class="steps">
+      <li id="step-upload"><span class="dot"></span> Uploading photo to repo</li>
+      <li id="step-queue"><span class="dot"></span> Waiting for workflow to start</li>
+      <li id="step-process"><span class="dot"></span> Veo is rendering the video</li>
+      <li id="step-done"><span class="dot"></span> Ready</li>
+    </ul>
+    <div class="elapsed" id="elapsed"></div>
+    <div class="error-msg" id="errorMsg"></div>
+    <a class="download-link" id="downloadLink" style="display:none" target="_blank">Download Video</a>
+    <a class="reset-link" id="resetLink" style="display:none">Generate another</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  const OWNER = "optimusprime2026vol1";
+  const REPO = "listing-reels";
+  const WORKFLOW_FILE = "veo-walkthrough.yml";
+  const API = "https://api.github.com";
+
+  const tokenInput = document.getElementById("token");
+  const fileInput = document.getElementById("fileInput");
+  const drop = document.getElementById("drop");
+  const preview = document.getElementById("preview");
+  const previewImg = document.getElementById("previewImg");
+  const previewName = document.getElementById("previewName");
+  const promptBox = document.getElementById("promptBox");
+  const generateBtn = document.getElementById("generateBtn");
+  const statusCard = document.getElementById("statusCard");
+  const setupCard = document.getElementById("setupCard");
+  const elapsedEl = document.getElementById("elapsed");
+  const errorMsgEl = document.getElementById("errorMsg");
+  const downloadLink = document.getElementById("downloadLink");
+  const resetLink = document.getElementById("resetLink");
+
+  let selectedFile = null;
+  let startTime = null;
+  let timerHandle = null;
+
+  // Restore token for convenience within this tab's session only.
+  tokenInput.value = sessionStorage.getItem("gh_token") || "";
+  tokenInput.addEventListener("input", () => {
+    sessionStorage.setItem("gh_token", tokenInput.value);
+  });
+
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("dragover"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!/^image\/(jpeg|png)$/.test(file.type)) {
+      alert("Please choose a JPG or PNG image.");
+      return;
+    }
+    selectedFile = file;
+    previewImg.src = URL.createObjectURL(file);
+    previewName.textContent = file.name;
+    preview.style.display = "block";
+    generateBtn.disabled = false;
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function setStep(id, state) {
+    const el = document.getElementById(id);
+    el.classList.remove("active", "done", "error");
+    if (state) el.classList.add(state);
+  }
+
+  function showError(msg) {
+    errorMsgEl.textContent = msg;
+    errorMsgEl.style.display = "block";
+    resetLink.style.display = "inline-block";
+    stopTimer();
+  }
+
+  function startTimer() {
+    startTime = Date.now();
+    timerHandle = setInterval(() => {
+      const secs = Math.floor((Date.now() - startTime) / 1000);
+      elapsedEl.textContent = `Elapsed: ${secs}s`;
+    }, 1000);
+  }
+  function stopTimer() {
+    if (timerHandle) clearInterval(timerHandle);
+  }
+
+  async function gh(path, options) {
+    const token = tokenInput.value.trim();
+    if (!token) throw new Error("Paste your GitHub token first.");
+    const res = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        ...(options && options.headers ? options.headers : {}),
+      },
+    });
+    if (!res.ok) {
+      let detail = "";
+      try { detail = JSON.stringify(await res.json()); } catch (e) {}
+      throw new Error(`${options && options.method ? options.method : "GET"} ${path} -> ${res.status}: ${detail}`);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+  }
+
+  // Commit the photo (and optional prompt file) as a single atomic commit
+  // via the Git Data API, so exactly one workflow run is triggered with
+  // both files present together.
+  async function commitFiles(files) {
+    const ref = await gh(`/repos/${OWNER}/${REPO}/git/refs/heads/main`);
+    const baseCommitSha = ref.object.sha;
+    const baseCommit = await gh(`/repos/${OWNER}/${REPO}/git/commits/${baseCommitSha}`);
+    const baseTreeSha = baseCommit.tree.sha;
+
+    const treeEntries = [];
+    for (const f of files) {
+      const blob = await gh(`/repos/${OWNER}/${REPO}/git/blobs`, {
+        method: "POST",
+        body: JSON.stringify({ content: f.content, encoding: f.encoding }),
+      });
+      treeEntries.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
+    }
+
+    const tree = await gh(`/repos/${OWNER}/${REPO}/git/trees`, {
+      method: "POST",
+      body: JSON.stringify({ base_tree: baseTreeSha, tree: treeEntries }),
+    });
+
+    const commit = await gh(`/repos/${OWNER}/${REPO}/git/commits`, {
+      method: "POST",
+      body: JSON.stringify({
+        message: "Add reference photo via dashboard",
+        tree: tree.sha,
+        parents: [baseCommitSha],
+      }),
+    });
+
+    await gh(`/repos/${OWNER}/${REPO}/git/refs/heads/main`, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: commit.sha }),
+    });
+
+    return commit.sha;
+  }
+
+  async function findRunForCommit(commitSha) {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const data = await gh(
+        `/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=10`
+      );
+      const match = (data.workflow_runs || []).find((r) => r.head_sha === commitSha);
+      if (match) return match;
+      await sleep(4000);
+    }
+    throw new Error("Timed out waiting for the workflow run to appear. Check the Actions tab manually.");
+  }
+
+  async function pollRun(runId) {
+    while (true) {
+      const run = await gh(`/repos/${OWNER}/${REPO}/actions/runs/${runId}`);
+      if (run.status === "completed") return run;
+      await sleep(8000);
+    }
+  }
+
+  function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+  function extAndMime(file) {
+    if (file.type === "image/png") return { ext: "png", mime: "image/png" };
+    return { ext: "jpg", mime: "image/jpeg" };
+  }
+
+  async function run() {
+    generateBtn.disabled = true;
+    setupCard.style.opacity = "0.5";
+    statusCard.style.display = "block";
+    errorMsgEl.style.display = "none";
+    downloadLink.style.display = "none";
+    resetLink.style.display = "none";
+    startTimer();
+
+    setStep("step-upload", "active");
+    try {
+      const { ext } = extAndMime(selectedFile);
+      const base = `photo-${Date.now()}`;
+      const photoB64 = await fileToBase64(selectedFile);
+
+      const files = [
+        { path: `assets/reference-photos/${base}.${ext}`, content: photoB64, encoding: "base64" },
+      ];
+      const customPrompt = promptBox.value.trim();
+      if (customPrompt) {
+        files.push({ path: `veo/prompts/${base}.txt`, content: customPrompt, encoding: "utf-8" });
+      }
+
+      const commitSha = await commitFiles(files);
+      setStep("step-upload", "done");
+
+      setStep("step-queue", "active");
+      const run = await findRunForCommit(commitSha);
+      setStep("step-queue", "done");
+
+      setStep("step-process", "active");
+      const finished = await pollRun(run.id);
+      stopTimer();
+
+      if (finished.conclusion !== "success") {
+        setStep("step-process", "error");
+        showError(
+          `Workflow finished with status "${finished.conclusion}". View the log:\n${finished.html_url}`
+        );
+        return;
+      }
+      setStep("step-process", "done");
+
+      setStep("step-done", "active");
+      const release = await gh(`/repos/${OWNER}/${REPO}/releases/tags/veo-build-${finished.run_number}`);
+      const asset = (release.assets || [])[0];
+      if (!asset) {
+        setStep("step-done", "error");
+        showError("Run succeeded but no video asset was found on the release. Check the Releases page.");
+        return;
+      }
+      setStep("step-done", "done");
+      downloadLink.href = asset.browser_download_url;
+      downloadLink.textContent = `Download ${asset.name}`;
+      downloadLink.style.display = "block";
+      resetLink.style.display = "inline-block";
+    } catch (err) {
+      showError(err.message || String(err));
+      const active = document.querySelector(".steps li.active");
+      if (active) { active.classList.remove("active"); active.classList.add("error"); }
+    } finally {
+      setupCard.style.opacity = "1";
+    }
+  }
+
+  generateBtn.addEventListener("click", run);
+  resetLink.addEventListener("click", () => location.reload());
+})();
+</script>
+</body>
+</html>
