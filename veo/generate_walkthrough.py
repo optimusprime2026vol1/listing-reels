@@ -67,29 +67,28 @@ def main() -> int:
             "parameters": params,
         }
 
-    # Preferred settings first; if the API rejects a parameter, fall back to
-    # progressively simpler ones rather than failing the whole run.
-    attempts = [
-        {
-            "aspectRatio": "9:16",
-            "resolution": "1080p",
-            "durationSeconds": 8,
-            "personGeneration": "allow_adult",
-        },
-        {
-            "aspectRatio": "9:16",
-            "resolution": "720p",
-            "durationSeconds": 8,
-            "personGeneration": "allow_adult",
-        },
-        {
-            "aspectRatio": "9:16",
-        },
-    ]
+    def offending_param(error_text: str, params: dict) -> str | None:
+        """If the API named a parameter in its error, return that key."""
+        for key in params:
+            if f"`{key}`" in error_text or f"'{key}'" in error_text or f'"{key}"' in error_text:
+                return key
+        return None
+
+    # Start with the ideal settings. If the API rejects the request, drop the
+    # exact parameter it named (or the next optional one) and retry, so a
+    # single unsupported option can't fail the whole run.
+    params = {
+        "aspectRatio": "9:16",
+        "resolution": "1080p",
+        "durationSeconds": 8,
+        "personGeneration": "allow_adult",
+    }
+    # Least important first -- these get dropped if the API doesn't say which.
+    drop_order = ["personGeneration", "durationSeconds", "resolution", "aspectRatio"]
 
     op_name = None
-    for i, params in enumerate(attempts, start=1):
-        print(f"Submitting {args.image} to {model} (attempt {i}: {params})...")
+    for attempt in range(1, 6):
+        print(f"Submitting {args.image} to {model} (attempt {attempt}: {params})...")
         resp = requests.post(
             f"{BASE_URL}/models/{model}:predictLongRunning",
             headers=headers,
@@ -102,10 +101,31 @@ def main() -> int:
                 break
             print(f"No operation name in response: {resp.text}")
             return 1
-        print(f"Attempt {i} rejected ({resp.status_code}): {resp.text}")
-        if i == len(attempts):
-            print("All attempts failed.")
+
+        print(f"Attempt {attempt} rejected ({resp.status_code}): {resp.text}")
+
+        # Figure out what to change for the next attempt.
+        bad = offending_param(resp.text, params)
+        if bad == "resolution" and params.get("resolution") == "1080p":
+            print("Retrying at 720p...")
+            params = dict(params, resolution="720p")
+            continue
+        if bad:
+            print(f"Dropping unsupported parameter: {bad}")
+            params = {k: v for k, v in params.items() if k != bad}
+            continue
+        # API didn't name a parameter -- drop the least important remaining one.
+        for key in drop_order:
+            if key in params:
+                print(f"Dropping '{key}' and retrying...")
+                params = {k: v for k, v in params.items() if k != key}
+                break
+        else:
+            print("No parameters left to adjust; giving up.")
             return 1
+    else:
+        print("All attempts failed.")
+        return 1
     print(f"Operation submitted: {op_name}")
 
     deadline = time.time() + MAX_WAIT_SECONDS
