@@ -111,6 +111,48 @@ Every push that touches `configs/`, `assets/photos/`, `assets/music/`, or
 `assets/voiceover/` rebuilds *all* listing configs and publishes a new
 release tagged `build-<run number>`.
 
+## AI photoreal walkthroughs (Veo on Vertex AI)
+
+A second, separate workflow (`.github/workflows/veo-walkthrough.yml`) turns
+one reference interior photo into a photoreal 3D-walkthrough video using
+Google's Veo model on Vertex AI. This is a different kind of output from the
+Ken-Burns reel above -- it's an AI-generated video, and it costs money per
+video (a paid Vertex AI API call).
+
+### One-time setup
+
+1. In Google Cloud Console, create a service account with the
+   **Vertex AI User** role, and generate a JSON key for it.
+2. In the repo, go to **Settings -> Secrets and variables -> Actions** and add:
+   - `GCP_SA_KEY` -- paste the entire JSON key file contents
+   - `GCP_PROJECT_ID` -- your Google Cloud project ID
+3. Make sure "Read and write permissions" is enabled under
+   Settings -> Actions -> General -> Workflow permissions (same as above).
+4. Make sure the Vertex AI API is enabled on your GCP project, and that your
+   project has access to Veo 3.1 (`veo-3.1-generate-001`).
+
+### Usage
+
+1. Drop a reference interior photo into `assets/reference-photos/` (e.g.
+   `assets/reference-photos/living-room.jpg`).
+2. (Optional) Add a matching prompt file at `veo/prompts/living-room.txt` to
+   customize the camera direction for that specific photo. If you skip this,
+   `veo/prompts/default.txt` (the cinematic walkthrough prompt) is used for
+   every photo.
+3. Push. The workflow submits the photo to Veo, polls until the video is
+   ready (this can take a few minutes), and publishes it as a GitHub
+   Release, tagged `veo-build-<run number>`.
+
+### Notes
+
+- Output is fixed at 1080x1920, 9:16, 8 seconds (Veo requires 8s for
+  image-to-video at 1080p).
+- Google's API response shape for the finished video isn't fully pinned
+  down across all their docs -- the script defensively checks a few known
+  formats. If your first run fails at the "Could not find video bytes"
+  step, copy the debug JSON it prints and share it so the parsing can be
+  adjusted to match your account's exact response shape.
+
 ## Notes / next steps
 
 - **Voiceover**: `voiceover` in the config points to a pre-rendered audio

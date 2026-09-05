@@ -1,0 +1,79 @@
+name: Veo AI Walkthrough
+
+# Push a reference photo to trigger a photoreal AI walkthrough video via
+# Veo on Vertex AI. No local install required.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/reference-photos/**"
+      - "veo/prompts/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Generate walkthroughs
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          mkdir -p renders_ai
+          shopt -s nullglob
+          photos=(assets/reference-photos/*.jpg assets/reference-photos/*.jpeg assets/reference-photos/*.png)
+          if [ ${#photos[@]} -eq 0 ]; then
+            echo "No reference photos found in assets/reference-photos/ -- nothing to do."
+            exit 0
+          fi
+          export GOOGLE_ACCESS_TOKEN=$(gcloud auth print-access-token)
+          for photo in "${photos[@]}"; do
+            name=$(basename "$photo")
+            base="${name%.*}"
+            prompt_file="veo/prompts/${base}.txt"
+            if [ ! -f "$prompt_file" ]; then
+              prompt_file="veo/prompts/default.txt"
+            fi
+            echo "::group::Generating walkthrough for $name (prompt: $prompt_file)"
+            python veo/generate_walkthrough.py \
+              --image "$photo" \
+              --prompt-file "$prompt_file" \
+              --out "renders_ai/${base}.mp4"
+            echo "::endgroup::"
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: veo-walkthroughs-${{ github.run_number }}
+          path: renders_ai/*.mp4
+          if-no-files-found: warn
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: veo-build-${{ github.run_number }}
+          name: "Veo AI walkthroughs #${{ github.run_number }}"
+          body: "Generated from commit ${{ github.sha }}"
+          files: renders_ai/*.mp4
